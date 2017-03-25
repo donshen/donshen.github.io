@@ -1,2 +1,3 @@
 name: Don Shen, Chemical Engineer
 markdown: kramdown
+permalink: /blog/:year/:month/:day/:title
