@@ -1,4 +1,8 @@
-
+/*
+	Aerial 1.0 by HTML5 UP
+	html5up.net | @n33co
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+*/
 @import url("http://fonts.googleapis.com/css?family=Source+Sans+Pro:300,900");
 @import url("font-awesome.min.css");
 
@@ -50,11 +54,11 @@
 	@keyframes wrapper { 0% { opacity: 0; } 100% { opacity: 1; } }
 
 	#wrapper {
-		-moz-animation: wrapper 1.5s forwards;
-		-webkit-animation: wrapper 1.5s forwards;
-		-o-animation: wrapper 1.5s forwards;
-		-ms-animation: wrapper 1.5s forwards;
-		animation: wrapper 1.5s forwards;
+		-moz-animation: wrapper 3s forwards;
+		-webkit-animation: wrapper 3s forwards;
+		-o-animation: wrapper 3s forwards;
+		-ms-animation: wrapper 3s forwards;
+		animation: wrapper 3s forwards;
 		height: 100%;
 		left: 0;
 		opacity: 0;
@@ -83,13 +87,10 @@
 		transform: translate3d(0,0,0);
 		background-color: black;
 		background-image: url("images/bg.jpg");
-		background-size: 100%;
-		background-position: center center;
+		background-position: bottom left;
 		background-repeat: repeat-x;
-		
+		height: 100%;
 		left: 0;
-		right: 0;
-		bottom: 0;
 		opacity: 1;
 		position: fixed;
 		top: 0;
@@ -101,8 +102,8 @@
 	@keyframes bg { 0% { -moz-transform: translate3d(0,0,0); -webkit-transform: translate3d(0,0,0); -o-transform: translate3d(0,0,0); -ms-transform: translate3d(0,0,0); transform: translate3d(0,0,0); } 100% { -moz-transform: translate3d(-2250px,0,0); -webkit-transform: translate3d(-2250px,0,0); -o-transform: translate3d(-2250px,0,0); -ms-transform: translate3d(-2250px,0,0); transform: translate3d(-2250px,0,0); } }
 
 	#bg {
-		background-size: 100%;
-
+		background-size: 2250px auto;
+		width: 6750px;
 	}
 
 /* Overlay */
