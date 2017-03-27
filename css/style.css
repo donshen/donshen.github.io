@@ -54,11 +54,11 @@
 	@keyframes wrapper { 0% { opacity: 0; } 100% { opacity: 1; } }
 
 	#wrapper {
-		-moz-animation: wrapper 3s forwards;
-		-webkit-animation: wrapper 3s forwards;
-		-o-animation: wrapper 3s forwards;
-		-ms-animation: wrapper 3s forwards;
-		animation: wrapper 3s forwards;
+		-moz-animation: wrapper 1.5s forwards;
+		-webkit-animation: wrapper 1.5s forwards;
+		-o-animation: wrapper 1.5s forwards;
+		-ms-animation: wrapper 1.5s forwards;
+		animation: wrapper 1.5s forwards;
 		height: 100%;
 		left: 0;
 		opacity: 0;
@@ -87,10 +87,12 @@
 		transform: translate3d(0,0,0);
 		background-color: #348cb2;
 		background-image: url("images/bg.jpg");
-		background-position: bottom left;
+		background-position: center center;
 		background-repeat: repeat-x;
 		height: 100%;
 		left: 0;
+		right: 0;
+		bottom: 0;
 		opacity: 1;
 		position: fixed;
 		top: 0;
@@ -102,7 +104,7 @@
 	@keyframes bg { 0% { -moz-transform: translate3d(0,0,0); -webkit-transform: translate3d(0,0,0); -o-transform: translate3d(0,0,0); -ms-transform: translate3d(0,0,0); transform: translate3d(0,0,0); } 100% { -moz-transform: translate3d(-2250px,0,0); -webkit-transform: translate3d(-2250px,0,0); -o-transform: translate3d(-2250px,0,0); -ms-transform: translate3d(-2250px,0,0); transform: translate3d(-2250px,0,0); } }
 
 	#bg {
-		background-size: 2250px auto;
+		background-size: 2250px cover;
 		width: 6750px;
 	}
 
