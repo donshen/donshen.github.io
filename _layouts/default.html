@@ -8,25 +8,29 @@
 <link rel="stylesheet" href="/assets/css/site.css">
 <link rel="alternate" type="application/atom+xml" title="{{ site.title }}" href="/feed.xml">
 </head>
-<body>
+<body{% if page.hero %} class="has-hero"{% endif %}>
 
-<div class="wrap sitenav">
-  <a class="brand" href="/">{{ site.title }}</a>
-  <nav>
-    <a href="/"{% if page.url == "/" %} aria-current="page"{% endif %}>Writing</a>
-    <a href="/about/"{% if page.url == "/about/" %} aria-current="page"{% endif %}>About</a>
-  </nav>
+<div class="navbar">
+  <div class="wrap sitenav">
+    <a class="brand" href="/">{{ site.title }}</a>
+    <nav>
+      <a href="/"{% if page.url == "/" %} aria-current="page"{% endif %}>Writing</a>
+      <a href="/about/"{% if page.url == "/about/" %} aria-current="page"{% endif %}>About</a>
+    </nav>
+  </div>
 </div>
 
 {{ content }}
 
-<div class="wrap sitefoot">
-  <ul>
-    <li><a href="https://scholar.google.com/citations?user=uBpioiAAAAAJ&amp;hl=en">Google Scholar</a></li>
-    <li><a href="https://www.linkedin.com/in/donshen16/">LinkedIn</a></li>
-    <li><a href="/feed.xml">RSS</a></li>
-  </ul>
-  <p>&copy; {{ site.time | date: "%Y" }} {{ site.title }}</p>
+<div class="footbar">
+  <div class="wrap sitefoot">
+    <ul>
+      <li><a href="https://scholar.google.com/citations?user=mX2LPRwAAAAJ&amp;hl=en">Google Scholar</a></li>
+      <li><a href="https://www.linkedin.com/in/donshen16/">LinkedIn</a></li>
+      <li><a href="/feed.xml">RSS</a></li>
+    </ul>
+    <p>&copy; {{ site.time | date: "%Y" }} {{ site.title }}</p>
+  </div>
 </div>
 
 </body>

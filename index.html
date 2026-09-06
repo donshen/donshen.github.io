@@ -1,13 +1,27 @@
 ---
 layout: default
+hero: true
 ---
-<div class="wrap home">
-  <div class="col">
-    <h1>Writing</h1>
-    <p class="intro">Notes on machine learning papers I have read closely, usually because a claim in one bothered me enough to go and check it. Long, occasional, and generally with something to drag.</p>
+<section class="hero">
+  <div class="hero-drift" aria-hidden="true"></div>
+  <div class="hero-scrim" aria-hidden="true"></div>
+
+  <div class="wrap hero-inner">
+    <h1>Zhengyuan&nbsp;(Don)&nbsp;Shen</h1>
+    <p class="hero-line">Notes on machine learning papers, mostly about how models actually work rather than what they score.</p>
+    <ul class="hero-links">
+      <li><a href="https://scholar.google.com/citations?user=mX2LPRwAAAAJ&amp;hl=en">Google Scholar</a></li>
+      <li><a href="https://www.linkedin.com/in/donshen16/">LinkedIn</a></li>
+      <li><a href="/feed.xml">RSS</a></li>
+    </ul>
   </div>
 
+  <a class="hero-cue" href="#writing">Writing</a>
+</section>
+
+<div class="wrap writing" id="writing">
   <div class="col">
+    <h2>Writing</h2>
     {% if site.posts.size == 0 %}
       <p class="empty">Nothing published yet.</p>
     {% else %}
@@ -15,7 +29,7 @@ layout: default
       {% for post in site.posts %}
       <li>
         <time datetime="{{ post.date | date_to_xmlschema }}">{{ post.date | date: "%-d %B %Y" }}</time>
-        <h2><a href="{{ post.url }}">{{ post.title }}</a></h2>
+        <h3><a href="{{ post.url }}">{{ post.title }}</a></h3>
         {% if post.dek %}<p>{{ post.dek }}</p>{% endif %}
       </li>
       {% endfor %}
