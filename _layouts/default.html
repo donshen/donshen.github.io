@@ -7,6 +7,7 @@
 <meta name="description" content="{{ page.dek | default: site.description | strip_html | truncate: 180 }}">
 <link rel="stylesheet" href="/assets/css/site.css">
 <link rel="alternate" type="application/atom+xml" title="{{ site.title }}" href="/feed.xml">
+{% if page.external %}<link rel="canonical" href="{{ page.external }}">{% endif %}
 </head>
 <body{% if page.hero %} class="has-hero"{% endif %}>
 

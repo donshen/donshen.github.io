@@ -303,6 +303,13 @@ body.has-hero .navbar nav a[aria-current=page]{color:#fff;border-bottom-color:va
 .postlist h3 a:hover{text-decoration:underline;text-decoration-color:var(--cool-text)}
 .postlist p{margin:0;font-size:.93rem;color:var(--ink-2);max-width:62ch}
 .empty{color:var(--ink-2);font-size:.95rem}
+.postlist .venue{font-family:var(--mono);font-size:.68rem;letter-spacing:.04em;
+  color:var(--ink-2);border:1px solid var(--hair);border-radius:2px;
+  padding:.12rem .4rem;margin-left:.55rem;white-space:nowrap;vertical-align:.14em}
+.postlist .byline{margin:.1rem 0 .35rem;font-size:.85rem;color:var(--ink-2)}
+.external-note{font-size:.92rem;color:var(--ink-2);
+  border-left:2px solid var(--hair);padding-left:.9rem;margin:0 0 1.5rem}
+.postbody > .col > .external-note:last-child{margin:1.8rem 0 0}
 
 @media (max-width:700px){
   .hero{--tile:1500px;padding:2.6rem 0 4.6rem}

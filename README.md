@@ -24,6 +24,18 @@ hand-written SVG, inline `<style>`, or `<script>`, because kramdown will otherwi
 The URL comes out as `/blog/YYYY/MM/DD/slug/`. The home page list, the Atom feed, and the
 meta description all populate themselves from front matter, so there is no index to update.
 
+### Optional front matter
+
+| Key | Effect |
+|---|---|
+| `external:` | A URL. The home page and the feed link straight there instead of to the local page, a venue tag appears next to the title, and the local page emits `<link rel="canonical">` at the real article so it never competes with it in search. |
+| `venue:` | Where an `external:` piece was published, shown as the tag. |
+| `byline:` | Co-authors, e.g. `"with A, B and C"`. Shown under the title and in the post header. |
+| `selfwrap: true` | Skip the standard prose wrapper. Only for posts that build their own `.wrap` / `.col` structure, like the looped-transformer one with its full-width figures. Ordinary prose should leave this off. |
+
+For an external piece, write a short summary in the body. That is what a reader who lands on
+the local permalink sees, and it beats an empty stub.
+
 ## Layout
 
 ```

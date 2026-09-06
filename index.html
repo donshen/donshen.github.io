@@ -8,7 +8,7 @@ hero: true
 
   <div class="wrap hero-inner">
     <h1>Zhengyuan&nbsp;(Don)&nbsp;Shen</h1>
-    <p class="hero-line">Notes on machine learning papers, mostly about how models actually work rather than what they score.</p>
+    <p class="hero-line">Notes on machine learning papers, mostly about how models actually work rather than what they score. Work published elsewhere is listed here too.</p>
     <ul class="hero-links">
       <li><a href="https://scholar.google.com/citations?user=mX2LPRwAAAAJ&amp;hl=en">Google Scholar</a></li>
       <li><a href="https://www.linkedin.com/in/donshen16/">LinkedIn</a></li>
@@ -29,7 +29,14 @@ hero: true
       {% for post in site.posts %}
       <li>
         <time datetime="{{ post.date | date_to_xmlschema }}">{{ post.date | date: "%-d %B %Y" }}</time>
-        <h3><a href="{{ post.url }}">{{ post.title }}</a></h3>
+        <h3>
+          {% if post.external %}
+            <a href="{{ post.external }}">{{ post.title }}</a><span class="venue">{{ post.venue }}</span>
+          {% else %}
+            <a href="{{ post.url }}">{{ post.title }}</a>
+          {% endif %}
+        </h3>
+        {% if post.byline %}<p class="byline">{{ post.byline }}</p>{% endif %}
         {% if post.dek %}<p>{{ post.dek }}</p>{% endif %}
       </li>
       {% endfor %}

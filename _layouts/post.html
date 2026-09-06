@@ -11,10 +11,31 @@ layout: default
       <p class="meta">
         <time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date: "%-d %B %Y" }}</time>
         {% if page.reading %}<span>{{ page.reading }}</span>{% endif %}
+        {% if page.byline %}<span>{{ page.byline }}</span>{% endif %}
       </p>
     </div>
   </header>
 
-  {{ content }}
+  {% comment %}
+    Posts that hand-roll their own .wrap / .col structure set selfwrap: true.
+    Everything else is ordinary prose and gets wrapped here.
+  {% endcomment %}
+  {% if page.selfwrap %}
+    {{ content }}
+  {% else %}
+    <div class="wrap postbody">
+      <div class="col">
+        {% if page.external %}
+        <p class="external-note">Published at <a href="{{ page.external }}">{{ page.venue }}</a>. What follows is a short summary; the full piece is there.</p>
+        {% endif %}
+
+        {{ content }}
+
+        {% if page.external %}
+        <p class="external-note"><a href="{{ page.external }}">Read it at {{ page.venue }}</a></p>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
 
 </article>
