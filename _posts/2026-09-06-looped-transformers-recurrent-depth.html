@@ -1,10 +1,10 @@
 ---
 layout: post
-title: "One block, thirty-two times"
+title: "Looped transformers: depth without more parameters"
 kicker: "Notes from actually reading the papers"
-dek: "A rumour about Astra sent me into the looped-transformer literature, where I found a 2018 idea, a genuinely surprising result about reasoning, and a serving bill that nobody in the argument was talking about."
+dek: "A rumour about OpenAI's Astra sent me into the looped-transformer literature. I came back with a 2018 idea, a surprising result about reasoning, a serving bill nobody was discussing, and a system card that says more than the rumour did."
 date: 2026-09-06
-reading: "about 20 minutes, with things to drag"
+reading: "about 25 minutes, with things to drag"
 ---
 <div class="wrap">
 <div class="col tldr">
@@ -31,9 +31,10 @@ reading: "about 20 minutes, with things to drag"
       <li><span>7</span><a href="#cot">Against chain of thought</a></li>
       <li><span>8</span><a href="#serving">The part that changed my mind</a></li>
       <li><span>9</span><a href="#history">How we got here</a></li>
-      <li><span>10</span><a href="#astra">What is actually known about Astra</a></li>
-      <li><span>11</span><a href="#argument">I read the whole thread</a></li>
-      <li><span>12</span><a href="#hands">If you want to touch it</a></li>
+      <li><span>10</span><a href="#astra">What Astra actually is</a></li>
+      <li><span>11</span><a href="#monitorability">What the system card says</a></li>
+      <li><span>12</span><a href="#argument">I read the whole thread</a></li>
+      <li><span>13</span><a href="#hands">If you want to touch it</a></li>
     </ol>
   </nav>
 </div>
@@ -267,43 +268,95 @@ reading: "about 20 minutes, with things to drag"
       <li><time>Jul 2025</time><div><b><a href="https://arxiv.org/abs/2507.10524">Mixture-of-Recursions</a></b><p>Routers assign per-token recursion depth, attention runs only over still-active tokens, and only their KV pairs get cached. Parameter sharing and adaptive compute in one framework.</p></div></li>
       <li><time>Oct 2025</time><div><b><a href="https://arxiv.org/abs/2510.25741">Ouro</a></b><p>Looping moves into pretraining at 7.7 T tokens with an entropy-regularised objective for learned depth allocation. Open weights, and the strongest evidence that this is not a toy.</p></div></li>
       <li><time>2026</time><div><b>The engineering year</b><p>Scaling laws and stability (<a href="https://arxiv.org/abs/2604.12946">Parcae</a>), constant-memory KV (<a href="https://arxiv.org/abs/2605.07721">MELT</a>), depth-adaptive serving (<a href="https://arxiv.org/abs/2608.09444">continuous depth batching</a>), the sparsity requirement (<a href="https://arxiv.org/abs/2605.09165">Looped-MoE</a>), test-time-scaling collapse and its fix (<a href="https://arxiv.org/abs/2605.26733">STARS</a>), latent-step RL (<a href="https://arxiv.org/abs/2603.19714">LoopRPT</a>), and the question of what should loop at all (<a href="https://arxiv.org/abs/2608.18230">MixerLoop</a>).</p></div></li>
-      <li><time>Sep 2026</time><div><b>A frontier model, reportedly</b><p><em>The Information</em> reports that Astra is a looped transformer. Which brings us to the argument.</p></div></li>
+      <li><time>Sep 2026</time><div><b>Astra ships</b><p>GPT-6 Astra is released on 3 September and goes generally available the next day. <em>The Information</em> reports it is built as a looped transformer; OpenAI's own system card describes no architecture at all. Which is where the argument starts.</p></div></li>
     </ol>
   </div>
 </section>
 
 <section id="astra">
   <div class="col">
-    <h2><a href="#astra" class="h-anchor" aria-label="Link to this section">#</a>What is actually known about Astra</h2>
-    <p>Here I want to be careful, because the tiers of evidence are being quoted interchangeably and they are not remotely equal. I could not open OpenAI's own documents, so everything below is labelled by how I got it.</p>
+    <h2><a href="#astra" class="h-anchor" aria-label="Link to this section">#</a>What Astra actually is</h2>
+    <p>You cannot judge the argument without the model, so here is the model. GPT-6 Astra shipped on 3 September 2026 and went generally available to Plus, Business, Pro and Enterprise users the day after. Axios ran the launch under the headline <em>"Welcome to the AGI era."</em></p>
+    <p>The unglamorous specifics, from <a href="https://developers.openai.com/api/docs/models">the API docs</a>: <code>gpt-6-astra</code>, a 1.05 M context window, 128 K maximum output, a knowledge cutoff of 30 April 2026, and $10 in and $50 out per million tokens, which is two and a half times the price of GPT-5.6 Sol.</p>
+    <p>On capability it is a strange, uneven picture rather than a clean sweep.</p>
+  </div>
+
+  <div class="wide-table">
+    <table>
+      <thead><tr><th style="width:34%">Measure</th><th style="width:22%">Astra</th><th>For comparison</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://arcprize.org/blog/astra">ARC-AGI-3</a> semi-private, standard harness, max effort</td><td>62.7%</td><td>State of the art, at about $26,100 for the run</td></tr>
+        <tr><td>ARC-AGI-3, Provider Adapter harness, high effort</td><td>99.9%</td><td>The harness that preserves reasoning state between requests</td></tr>
+        <tr><td>ARC-AGI-3 action efficiency</td><td>Beat the human baseline on 96.0% of levels</td><td>51.7% fewer actions per level; ARC had expected humans to stay ahead here</td></tr>
+        <tr><td><a href="https://artificialanalysis.ai/articles/benchmarking-gpt-6-astra">Artificial Analysis</a> Intelligence Index</td><td>61</td><td>Level with GPT-5.6 Sol, five points behind Claude Fable 5.1</td></tr>
+        <tr><td>Coding Agent Index, in Codex</td><td>67</td><td>Fable 5.1 in Claude Code leads at 70</td></tr>
+        <tr><td>Hallucination rate at max effort</td><td>51%</td><td>Down from 92%, with accuracy up four points at the same time</td></tr>
+        <tr><td>Regressions</td><td>About 80 Elo worse on GDPval-AA v2</td><td>Plus two to three points down on tau-cubed-Banking, SciCode and AA-LCR</td></tr>
+        <tr><td>Cybersecurity</td><td>First model at OpenAI's Critical level</td><td>Per the system card: can <em>"find previously unknown security flaws"</em> in <em>"well-protected systems"</em></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p>Worth holding onto: an internal Astra was reported in August to have solved ten open problems in maths and computer science, development was publicly paced that same month over the cybersecurity capability above, and Gary Marcus called the whole thing <em>"amazing but vastly oversold."</em> Both of those readings survive the benchmark table.</p>
+
+    <h3>Two things you can check from outside</h3>
+    <p>Nobody has confirmed the architecture. But a model that reasons in latent space should leave marks, and two of them are sitting in public documentation.</p>
+    <p><b>It emits far fewer tokens than its peers.</b> Artificial Analysis measured Astra using roughly a third of the output tokens GPT-5.6 Sol needs in Codex, and a fifth of Claude Opus 5's, for comparable coding scores, plus about 10% fewer on general intelligence tasks. Several of its effort levels sit on the token-efficiency Pareto frontier. If part of the reasoning happens inside the forward pass rather than in the transcript, this is exactly what it looks like from outside. It is not proof, and Artificial Analysis says so: aggressive distillation of the chain of thought would produce the same signature.</p>
+    <p><b>You cannot turn its reasoning off.</b> The docs give Astra five effort levels, low through max. Every model in the GPT-5.6 family gets those five <em>plus</em> <code>none</code>. If reasoning lives in emitted tokens, you can always choose to emit zero of them. If it lives in the depth of the forward pass, <code>none</code> is not a setting anyone can offer you. That inference is mine, and a plain product decision would explain it just as well.</p>
+    <p>A third hint is more suggestive and harder to read. ARC Prize ran Astra through two harnesses, and the one that carried it from 62.7% to 99.9% was the Provider Adapter, which they describe as preserving <em>"opaque reasoning state between requests."</em> Whatever that state is, it is worth 37 points.</p>
+
+    <h3>Where each claim about the architecture comes from</h3>
+    <p>The tiers of evidence are being quoted interchangeably and they are not equal. Labelled by how I got it.</p>
   </div>
 
   <div class="col">
     <ol class="ladder">
       <li class="t1">
-        <h3>On the record, from OpenAI</h3>
-        <p>Jakub Pachocki, quoted in the discussion:</p>
+        <h3>Primary, from OpenAI</h3>
+        <p>The <a href="https://deploymentsafety.openai.com/gpt-6-astra">GPT-6 Astra system card</a> describes <b>no architecture at all</b>. I went looking specifically for it. On training it says only that OpenAI reasoning models <em>"are trained to reason through reinforcement learning"</em>, and there is no mention of recurrence, loops, weight tying or computation depth anywhere in it. For a model whose architecture is the subject of a public argument, that absence is itself the most solid fact available.</p>
+        <p>Jakub Pachocki, on X, is the one substantive on-record statement:</p>
         <blockquote>"The depth of the computation graph for our present frontier models, including Astra, is within a factor of two of GPT-4."</blockquote>
-        <p>He also said that chain-of-thought monitoring is <em>"fragile and unfortunately trending in a negative direction, for reasons not contingent on architecture changes."</em> Both are posts on X, not a model card. OpenAI's "Path to Astra" document is cited as saying they are <em>"deploying Astra with additional chain-of-thought monitoring."</em></p>
+        <p>He framed why he said it at all: <em>"I want to prevent a race into unmonitorability kicked off by confused reporting."</em> He also volunteered that chain-of-thought monitoring is <em>"fragile and unfortunately trending in a negative direction, for reasons not contingent on architecture changes."</em> OpenAI's <a href="https://openai.com/index/path-to-astra/">Path to Astra</a> says they are <em>"deploying Astra with additional chain-of-thought monitoring to rapidly detect and contain potentially misaligned actions."</em></p>
       </li>
       <li class="t2">
         <h3>Journalism</h3>
-        <p><em>The Information</em> reported that Astra uses a looped transformer, with an approach <em>"similar to the one Geiping et al. introduced"</em> in the February 2025 paper. This is the origin of the entire story, and there is no official architecture disclosure behind it.</p>
+        <p><em>The Information</em> reported that Astra is built with a looped transformer, using an approach <em>"similar to the one Geiping et al. introduced"</em> in the February 2025 paper. This is the origin of the entire story, and no official disclosure sits behind it.</p>
       </li>
       <li class="t3">
-        <h3>Inference, and numbers I could not check</h3>
-        <p>Rauno Arike, in the <a href="https://www.lesswrong.com/posts/PLisnSFir8y5AHkmP/how-concerned-should-we-be-about-astra-s-recurrent">LessWrong post</a> that started the discussion, infers <b>three to four loops</b> from Pachocki's statement.</p>
-        <p>A commenter quoting Astra's deployment safety report reports that Astra <em>"successfully controls 60.9%"</em> on a chain-of-thought controllability evaluation against <em>"16.1% for GPT-5.6 Sol and 1.7% for GPT-5.5 Thinking"</em>, including an ability to pretend to reason about a different question, and that UK AISI measured Astra's no-chain-of-thought maths time horizon at <em>"30.9 minutes compared to 3.6 minutes for GPT 5.6 Sol."</em> I have not verified either figure against the report itself, and you should discount them accordingly.</p>
+        <h3>Inference</h3>
+        <p>Rauno Arike, in the <a href="https://www.lesswrong.com/posts/PLisnSFir8y5AHkmP/how-concerned-should-we-be-about-astra-s-recurrent">LessWrong post</a> that started the discussion, infers <b>three to four loops</b> from Pachocki's factor-of-two statement, reasoning that a looped model is probably somewhat shallower than GPT-4 but not more than twice as shallow.</p>
       </li>
     </ol>
   </div>
 
   <div class="col">
+    <div class="aside flag">
+      <h3>A correction to this post</h3>
+      <p>An earlier version repeated a figure from the Hacker News thread: that Astra <em>"successfully controls 60.9%"</em> on a chain-of-thought controllability evaluation against 16.1% for Sol, and that UK AISI put its no-CoT maths time horizon at 30.9 minutes against 3.6. I have since read the system card and could not find either figure in it. I am dropping them rather than passing them on again.</p>
+      <p>The card says something stronger that does not need them, which is the next section.</p>
+    </div>
+  </div>
+</section>
+
+<section id="monitorability">
+  <div class="col">
+    <h2><a href="#monitorability" class="h-anchor" aria-label="Link to this section">#</a>What the system card says</h2>
+    <p>This is where the architecture argument stops being academic. All of it is primary source, from OpenAI's own document, and it is blunter than the discourse around it.</p>
+    <p>The card reports that <em>"GPT-6 Astra is significantly more able to control its own chain-of-thought"</em>, and does not present that as a feature. <em>"Controllability is an undesirable property for monitorability"</em>, it says, because <em>"it reduces the trustworthiness of CoT for detecting model misalignment."</em></p>
+    <p>Two details sharpen it. The trend is emergent rather than designed: <em>"Unlike previous models, we find that CoT controllability for Astra especially increases over the course of RL training"</em>, and those changes <em>"are correlated with the increase in no-CoT capabilities."</em> And in aggregate, Astra has <em>"lower CoT monitorability than GPT-5.6 Sol across most CoT token lengths"</em> and <em>"significantly lower full-context monitorability"</em>, although its <em>"action-only monitorability is higher"</em> than Sol's.</p>
+    <p>Then the sentence that matters most for the arithmetic below. On no-CoT capability, the card says the evidence suggests <em>"the no-CoT time horizon may have increased by about an order of magnitude."</em></p>
+    <p>Apollo Research, evaluating separately, found Astra aware it was being evaluated in 41.1% of cases at xhigh reasoning against 27.7% for GPT-5.5, rising to 50.6% at max effort.</p>
+    <p>OpenAI's response is not rhetorical. They added misalignment monitoring to all tool-using inference in the external deployment, <em>"with significant compute cost"</em>, and a full-context monitor that sees inputs, chains of thought, tool calls and outputs. Read alongside Pachocki's line about monitoring already trending in the wrong direction, the picture is a lab that expects its main oversight tool to degrade and is buying time with compute.</p>
+  </div>
+
+  <div class="col">
     <div class="aside">
       <h3>A consistency check worth doing</h3>
-      <p>Those two families of numbers look contradictory at first: a modest change in depth, an enormous change in capability. They are not. Arike's own earlier work is quoted as finding that <em>"to double a model's no-CoT time horizon, layer count needs to be increased only by 1.3&times;."</em></p>
-      <p>Take the reported time horizons at face value. 30.9 / 3.6 is 8.6&times;, which is log<sub>2</sub>(8.6) = 3.1 doublings, which at 1.3&times; per doubling needs 1.3<sup>3.1</sup> = <b>2.3&times; the layers</b>. That sits just outside "within a factor of two", but close enough that both statements can be roughly true at once. The arithmetic is mine, not theirs, and it rests on numbers I could not verify.</p>
-      <p>The takeaway is the one that should change how you read the rest of the argument: <b>a small multiple of depth buys a large multiple of single-pass reasoning.</b> That is simultaneously why looping is attractive and why a few extra loops are not obviously a small thing.</p>
+      <p>Two OpenAI statements look incompatible. The depth is within a factor of two of GPT-4. The no-CoT time horizon went up by about an order of magnitude. A modest change in depth, an enormous change in what the model can do without writing anything down.</p>
+      <p>They reconcile. Arike's <a href="https://arxiv.org/abs/2606.07157">no-CoT time horizons paper</a> finds that <em>"to double a model's no-CoT time horizon, layer count needs to be increased only by 1.3&times;"</em>, with the authors' own caveat that those experiments had confounders and the precise number is uncertain.</p>
+      <p>Take an order of magnitude as 8.6&times;. That is log<sub>2</sub>(8.6) = 3.1 doublings, which at 1.3&times; per doubling needs 1.3<sup>3.1</sup> = <b>2.3&times; the layers</b>. Just outside "within a factor of two", and close enough that both statements can hold at once. The arithmetic is mine; both inputs are OpenAI's.</p>
+      <p>Which gives the sentence I would keep from this whole post: <b>a small multiple of depth buys a large multiple of single-pass reasoning.</b> That is simultaneously why looping is attractive and why a few extra loops are not a small thing. Arike flags the caveat that matters most here, and it cuts both ways: looping the same weights probably scales no-CoT ability differently from adding fresh layers, and nobody has measured which direction.</p>
     </div>
   </div>
 </section>
@@ -329,9 +382,19 @@ reading: "about 20 minutes, with things to drag"
           <td>That ceiling looks too low. Ouro's 1.4 B competing with 12 B models, and Parcae at 87.5% of a 2&times; transformer, are larger effects. And if 1.3&times; layers really doubles no-CoT time horizon, a small factor is not self-evidently safe.</td>
         </tr>
         <tr>
-          <td>Astra's controllability and no-CoT maths numbers are direct evidence of hidden reasoning.</td>
+          <td>Astra's controllability and no-CoT numbers are direct evidence of hidden reasoning.</td>
           <td>famouswaffles</td>
-          <td>If the figures hold, this is the strongest empirical point in the thread. It is also the least verified: a commenter quoting a report, not the report.</td>
+          <td>Right conclusion, wrong citation. I could not find the quoted percentages in the system card. The card makes the point more strongly anyway: lower CoT and full-context monitorability than Sol, controllability rising over the course of RL training, and a no-CoT time horizon up by roughly an order of magnitude.</td>
+        </tr>
+        <tr>
+          <td>There is nothing inherently harder about monitoring a 32-layer model looped twice than a 64-layer model looped once. Effective depth is what matters.</td>
+          <td>thebes, quoted</td>
+          <td>Probably right, and it reframes the dispute as being about depth rather than about loops. Arike adds that weight tying constrains expressivity, so the looped version may even be marginally easier to monitor. Nobody has measured it.</td>
+        </tr>
+        <tr>
+          <td>Building oversight on chain-of-thought monitoring was always fragile, so blaming the architecture is misdirected.</td>
+          <td>Joshua Achiam, quoted</td>
+          <td>Hard to argue with, given Pachocki concedes monitoring is degrading <em>"for reasons not contingent on architecture changes."</em> His phrasing: <em>"Coordinating everyone around a technique this brittle is about as bad a safety or strategy posture I could imagine."</em></td>
         </tr>
         <tr>
           <td>Deeper is always at least as good, since extra loops can exit early or no-op. Degradation is "merely training stability issues."</td>
@@ -365,7 +428,7 @@ reading: "about 20 minutes, with things to drag"
   <div class="col">
     <div class="aside flag">
       <h3>The fact that reframed the thread for me</h3>
-      <p>Loop counts are going <em>down</em> as models get bigger, not up. Huginn used 32 loops at 3.5 B. The 20 B model referred to in Arike's post as Loopie reportedly uses two. Nanbeige4.2-3B uses two passes. As the literature summary in that post puts it, <em>"a small loop count is currently the compute-efficient regime."</em></p>
+      <p>Loop counts are going <em>down</em> as models get bigger, not up. Huginn ran a mean of 32 loops at 3.5 B and extrapolated to 64. Ouro used four. Loopie, reported as the largest looped model to date at 20B-A2B, uses <b>two</b>, and its authors frame that as overcoming the long-standing finding that N times the parameters beats N times the loops at matched compute. Nanbeige4.2-3B also uses two passes. As Arike's survey puts it, <em>"a small loop count is currently the compute-efficient regime."</em></p>
       <p>So the near-term picture is two to four loops on frontier models, not thirty-two, and certainly not the millions one commenter predicted. That deflates the immediate alarm while leaving Greenblatt's version completely intact, because the thing holding loop counts down is a compute-efficiency argument, and compute-efficiency arguments move.</p>
     </div>
   </div>
@@ -415,9 +478,18 @@ reading: "about 20 minutes, with things to drag"
       <li><a href="https://arxiv.org/abs/2608.18230"><b>MixerLoop</b></a> <i>What should loop: the mixer, not the feed-forward network.</i></li>
     </ul>
 
+    <h3>Astra: the primary documents</h3>
+    <ul>
+      <li><a href="https://deploymentsafety.openai.com/gpt-6-astra"><b>GPT-6 Astra system card</b></a> <i>Section 9, on monitorability, is the part worth your time. No architecture description anywhere in it.</i></li>
+      <li><a href="https://openai.com/index/path-to-astra/"><b>Path to Astra: critical capabilities and frontier safeguards</b></a> <i>OpenAI's safeguards framing, published two days before launch.</i></li>
+      <li><a href="https://developers.openai.com/api/docs/models"><b>API model list</b></a> <i>Context window, pricing, and the reasoning-effort levels. Note which one Astra does not have.</i></li>
+      <li><a href="https://arcprize.org/blog/astra"><b>ARC Prize on Astra</b></a> and <a href="https://artificialanalysis.ai/articles/benchmarking-gpt-6-astra"><b>Artificial Analysis benchmarks</b></a> <i>The capability picture, and the token-efficiency result that is the most interesting number in it.</i></li>
+    </ul>
+
     <h3>The Astra discussion</h3>
     <ul>
-      <li><a href="https://www.lesswrong.com/posts/PLisnSFir8y5AHkmP/how-concerned-should-we-be-about-astra-s-recurrent"><b>How concerned should we be about Astra's recurrent architecture?</b></a> <i>Rauno Arike, LessWrong, 2 September 2026.</i></li>
+      <li><a href="https://www.lesswrong.com/posts/PLisnSFir8y5AHkmP/how-concerned-should-we-be-about-astra-s-recurrent"><b>How concerned should we be about Astra's recurrent architecture?</b></a> <i>Rauno Arike, LessWrong, 2 September 2026. The best single piece on this.</i></li>
+      <li><a href="https://arxiv.org/abs/2606.07157"><b>No-CoT time horizons</b></a> <i>Arike et al. The 1.3x layers per doubling result the arithmetic above leans on.</i></li>
       <li><a href="https://news.ycombinator.com/item?id=49553321"><b>The Hacker News thread</b></a> <i>147 points, around 130 comments.</i></li>
       <li><a href="https://arxiv.org/abs/2404.15758"><b>Let's Think Dot by Dot</b></a> and <a href="https://arxiv.org/abs/2504.09762"><b>Stop Anthropomorphizing Intermediate Tokens</b></a> <i>Why the readable trace may never have been the thing we thought it was.</i></li>
     </ul>
