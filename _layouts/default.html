@@ -1,29 +1,33 @@
-<!DOCTYPE html>
-	<html>
-		<head>
-			<title>{{ page.title }}</title>
-			<!-- link to main stylesheet -->
-			<link rel="stylesheet" type="text/css" href="/css/main.css">
-		</head>
-		<body>
-			<nav>
-	    		<ul>
-	        		<li><a href="/">Home</a></li>
-		        	<li><a href="/about">About</a></li>
-	        		<li><a href="/cv">CV</a></li>
-	        		<li><a href="/experience">Experience</a></li>
-	    		</ul>
-			</nav>
-			<div class="container">
-			
-			{{ content }}
-			
-			</div><!-- /.container -->
-			<footer>
-	    		<ul>
-	        		<li><a href="mailto:don.z.shen@gmail.com">email</a></li>
-	        		<li><a href="https://github.com/donshen">github.com/donshen</a></li>
-				</ul>
-			</footer>
-		</body>
-	</html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% if page.title %}{{ page.title }} - {{ site.title }}{% else %}{{ site.title }}{% endif %}</title>
+<meta name="description" content="{{ page.dek | default: site.description | strip_html | truncate: 180 }}">
+<link rel="stylesheet" href="/assets/css/site.css">
+<link rel="alternate" type="application/atom+xml" title="{{ site.title }}" href="/feed.xml">
+</head>
+<body>
+
+<div class="wrap sitenav">
+  <a class="brand" href="/">{{ site.title }}</a>
+  <nav>
+    <a href="/"{% if page.url == "/" %} aria-current="page"{% endif %}>Writing</a>
+    <a href="/about/"{% if page.url == "/about/" %} aria-current="page"{% endif %}>About</a>
+  </nav>
+</div>
+
+{{ content }}
+
+<div class="wrap sitefoot">
+  <ul>
+    <li><a href="https://scholar.google.com/citations?user=uBpioiAAAAAJ&amp;hl=en">Google Scholar</a></li>
+    <li><a href="https://www.linkedin.com/in/donshen16/">LinkedIn</a></li>
+    <li><a href="/feed.xml">RSS</a></li>
+  </ul>
+  <p>&copy; {{ site.time | date: "%Y" }} {{ site.title }}</p>
+</div>
+
+</body>
+</html>

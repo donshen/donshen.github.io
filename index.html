@@ -1,64 +1,25 @@
-<!DOCTYPE HTML>
-<!--
-	Good Layout
--->
-<html>
-	<head>
-		<title>SchromZY</title>
-		<meta http-equiv="content-type" content="text/html; charset=utf-8" />
-		<meta name="description" content="" />
-		<meta name="keywords" content="" />
-		<!--[if lte IE 8]><script src="css/ie/html5shiv.js"></script><![endif]-->
-		<script src="js/skel.min.js"></script>
-		<script src="js/init.js"></script>
-		<noscript>
-			<link rel="stylesheet" href="css/skel.css" />
-			<link rel="stylesheet" href="css/style.css" />
-			<link rel="stylesheet" href="css/style-wide.css" />
-			<link rel="stylesheet" href="css/style-noscript.css" />
-		</noscript>
-		<!--[if lte IE 9]><link rel="stylesheet" href="css/ie/v9.css" /><![endif]-->
-		<!--[if lte IE 8]><link rel="stylesheet" href="css/ie/v8.css" /><![endif]-->
-	</head>
-	<body class="loading">
-		<div id="wrapper">
-			<div id="bg"></div>
-			<div id="overlay"></div>
-			<div id="main">
+---
+layout: default
+---
+<div class="wrap home">
+  <div class="col">
+    <h1>Writing</h1>
+    <p class="intro">Notes on machine learning papers I have read closely, usually because a claim in one bothered me enough to go and check it. Long, occasional, and generally with something to drag.</p>
+  </div>
 
-				<!-- Header -->
-					<header id="header">
-						<h2>Zhengyuan (Don) Shen</h2>
-						<h3>沈正元</h3>
-						<img src="css/images/me.jpg" alt="Zhengyuan (Don) Shen" style="max-width: 150px; border-radius: 50%; margin-bottom: 15px;">
-						<p><a href="/about">About</a> &nbsp;&bull;&nbsp; <a href="/CV">CV</a> &nbsp;&bull;&nbsp; <a href="/blog">Experience</a> </p>
-						<p>                                                                                                              </p>
-						<p>                                                                                                              </p>
-						<p>                                                                                                              </p>
-						<p>                                                                                                              </p>
-						<nav>
-							<ul>
-								<li><a href="mailto:don.z.shen@gmail.com"><img src="css/images/icons/email.png" alt="Email" width="45"></a></li>
-								<li><a href="https://www.linkedin.com/in/donshen16/"><img src="css/images/icons/linkedin.png" alt="Linkedin" width="45"></a></li>
-								<li><a href="https://scholar.google.com/citations?user=uBpioiAAAAAJ&hl=en"><img src="css/images/icons/google-scholar.png" alt="Google Scholar" width="45"></a></li>
-								<li><a href="https://github.com/donshen"><img src="css/images/icons/github.png" alt="GitHub" width="45"></a></li>
-							</ul>
-						</nav>
-					</header>
-
-
-
-				<!-- Footer
-					<footer id="footer">
-						<span class="copyright">Copyright &copy; Zhengyuan Shen</span>
-					</footer> -->
-				
-			</div>
-		</div>
-	</body>
-</html>
-
-
-
-
-
+  <div class="col">
+    {% if site.posts.size == 0 %}
+      <p class="empty">Nothing published yet.</p>
+    {% else %}
+    <ol class="postlist">
+      {% for post in site.posts %}
+      <li>
+        <time datetime="{{ post.date | date_to_xmlschema }}">{{ post.date | date: "%-d %B %Y" }}</time>
+        <h2><a href="{{ post.url }}">{{ post.title }}</a></h2>
+        {% if post.dek %}<p>{{ post.dek }}</p>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+  </div>
+</div>

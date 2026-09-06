@@ -1,0 +1,439 @@
+---
+layout: post
+title: "One block, thirty-two times"
+kicker: "Notes from actually reading the papers"
+dek: "A rumour about Astra sent me into the looped-transformer literature, where I found a 2018 idea, a genuinely surprising result about reasoning, and a serving bill that nobody in the argument was talking about."
+date: 2026-09-06
+reading: "about 20 minutes, with things to drag"
+---
+<div class="wrap">
+<div class="col tldr">
+    <h2>The short version</h2>
+    <ul>
+      <li>A looped transformer runs the same weights several times instead of stacking new ones. You get depth without paying for parameters.</li>
+      <li>It works better than I expected. Open 1.4 B looped models are trading punches with 12 B baselines.</li>
+      <li>It is old. <a href="https://arxiv.org/abs/1807.03819">Universal Transformers</a> did this in 2018, and people are right to say so.</li>
+      <li>The real costs are in serving, not in the architecture: your KV cache grows with depth, batching breaks, and the loop order decides your memory bandwidth.</li>
+      <li>Loop counts are going <em>down</em> as models get bigger, not up. That reframes most of the safety argument.</li>
+      <li>What is publicly known about Astra's architecture is essentially one sentence from one OpenAI researcher. Everything else is journalism or inference.</li>
+    </ul>
+  </div>
+
+  <nav class="col toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><span>1</span><a href="#rent">Depth you can rent</a></li>
+      <li><span>2</span><a href="#anatomy">Where I got it wrong first</a></li>
+      <li><span>3</span><a href="#orbits">What the state does while it loops</a></li>
+      <li><span>4</span><a href="#training">Three tricks that make it trainable</a></li>
+      <li><span>5</span><a href="#scaling">How far it goes, and where it breaks</a></li>
+      <li><span>6</span><a href="#dissociation">Reasoning wants depth, facts want parameters</a></li>
+      <li><span>7</span><a href="#cot">Against chain of thought</a></li>
+      <li><span>8</span><a href="#serving">The part that changed my mind</a></li>
+      <li><span>9</span><a href="#history">How we got here</a></li>
+      <li><span>10</span><a href="#astra">What is actually known about Astra</a></li>
+      <li><span>11</span><a href="#argument">I read the whole thread</a></li>
+      <li><span>12</span><a href="#hands">If you want to touch it</a></li>
+    </ol>
+  </nav>
+</div>
+
+<div class="wrap postbody">
+
+<section id="rent">
+  <div class="col">
+    <h2><a href="#rent" class="h-anchor" aria-label="Link to this section">#</a>Depth you can rent</h2>
+    <p class="lede">Last week <em>The Information</em> reported that OpenAI's Astra uses a looped transformer. The internet had opinions immediately, and I realised I could not defend a position either way. So I went and read the literature. This is what I found, roughly in the order that made it click.</p>
+    <p>Start with why depth matters at all, because everything else rests on it. Depth is what lets a transformer do one thing <em>after</em> another. A 32-layer model gets 32 chances to compose a result before it has to commit to a token, and if your problem genuinely needs 60 sequential steps, no amount of width or context will rescue it in a single forward pass.</p>
+    <p>The usual way to buy those steps is to add layers, each with its own weights. Parameters and depth go up together, which is convenient, because parameters also buy something completely different: somewhere to put facts.</p>
+    <p>Looping decouples the two. Store <code>k</code> layers, run them <code>L</code> times, and get roughly <code>kL</code> layers of serial computation out of <code>k</code> layers of storage. You pay in compute and in memory traffic, but not in parameters. Saunshi and colleagues put the claim about as sharply as it can be put: many reasoning problems <em>"require a large depth but not necessarily many parameters"</em>, and a k-layer transformer looped L times <em>"nearly matches the performance of a kL-layer non-looped model"</em> while being far better than the k-layer model it was built from <a class="src" href="https://arxiv.org/abs/2502.17416">arXiv:2502.17416</a>.</p>
+    <p>Drag the slider below and watch the two numbers come apart. That gap is the entire pitch. One convention for the rest of the post: teal marks an early iteration and amber a late one, so the diagrams warm up as the loop runs on.</p>
+  </div>
+
+  <figure>
+    <div class="scope">
+      <p class="scope-title">What you store, and what actually runs</p>
+      <p class="scope-sub">One recurrent block is stored once and executed r times. Parameters stay flat; serial computation grows linearly.</p>
+      <div class="reads">
+        <div class="read cold"><b id="r-params">3.5&nbsp;B</b><span>unique parameters (fixed)</span></div>
+        <div class="read hot"><b id="r-depth">66</b><span>effective layers, 2 + 4r + 2</span></div>
+        <div class="read"><b id="r-flops">8&times;</b><span>forward cost vs r = 1</span></div>
+      </div>
+      <svg id="sv-hero" viewBox="0 0 940 210" role="img" aria-labelledby="hero-alt"></svg>
+      <p id="hero-alt" hidden>A single recurrent block with a loop arrow, beside the same block unrolled into a chain of r copies between a prelude and a coda.</p>
+      <div class="ctl">
+        <label for="in-r">recurrence r <input type="range" id="in-r" min="1" max="64" value="8" step="1"><output id="out-r">8</output></label>
+      </div>
+    </div>
+    <figcaption>Numbers follow Huginn-0125, the 3.5 B proof of concept in Geiping et al. <a class="src" href="https://arxiv.org/abs/2502.05171">arXiv:2502.05171</a>, which uses a 2 / 4 / 2 layout. At r = 32 that is an effective depth of 2 + 4(32) + 2 = 132 layers.</figcaption>
+  </figure>
+</section>
+
+<section id="anatomy">
+  <div class="col">
+    <h2><a href="#anatomy" class="h-anchor" aria-label="Link to this section">#</a>Where I got it wrong first</h2>
+    <p>My first mental model was a <code>for</code> loop wrapped around a whole transformer. That is not it, and the difference turns out to matter.</p>
+    <p>There are three pieces, and only the middle one loops. A prelude embeds the input, a recurrent core iterates, a coda reads out.</p>
+  </div>
+
+  <div class="col">
+    <div class="eq">
+      <b>e</b> = P(<b>x</b>) <i>&nbsp; prelude: embed into latent space</i><br>
+      <b>s</b><sub>0</sub> ~ N(0, &sigma;<sup>2</sup>I) <i>&nbsp; random start, not zeros</i><br>
+      <b>s</b><sub>i</sub> = R(<b>e</b>, <b>s</b><sub>i-1</sub>) <i>&nbsp; core, for i = 1 .. r</i><br>
+      <b>p</b> = C(<b>s</b><sub>r</sub>) <i>&nbsp; coda: un-embed to logits</i>
+    </div>
+    <p>Look at the third line again. <code>R</code> takes <em>two</em> arguments. The embedded input goes back in at every single step, not just the first, through an adapter that maps the concatenation of the running state and the input back down to the hidden size.</p>
+    <p>This is the detail I would have skipped, and it is load-bearing. Geiping et al. are blunt about it: if <b>e</b> were supplied only at the start, <em>"the iterative process would not be stable."</em> An unanchored loop drifts. An anchored one has somewhere to converge to. If you only remember one implementation detail from this post, remember that the loop needs to keep seeing the question.</p>
+  </div>
+
+  <figure>
+    <div class="scope">
+      <p class="scope-title">The prelude output is injected at every step</p>
+      <p class="scope-sub">The blue bus is the embedded input, tapping into each iteration of the core. The grey chain along the top is the state being handed forward.</p>
+      <svg id="sv-anat" viewBox="0 0 940 250" role="img" aria-label="Diagram: a prelude feeds an embedding bus that taps into every copy of the recurrent core, whose state chain runs left to right into a coda."></svg>
+    </div>
+    <figcaption>The adapter is <code>A : R<sup>2h</sup> &rarr; R<sup>h</sup></code> applied to <code>concat(s<sub>i-1</sub>, e)</code>.</figcaption>
+  </figure>
+
+  <div class="col">
+    <p>Notice what is absent: there is no hidden state carried across token positions. The recurrence runs vertically, inside one forward pass, and then it is thrown away. That matters later, because nothing accumulates across a conversation the way it would in an RNN, which is the strongest thing you can say in the architecture's defence.</p>
+  </div>
+</section>
+
+<section id="orbits">
+  <div class="col">
+    <h2><a href="#orbits" class="h-anchor" aria-label="Link to this section">#</a>What the state does while it loops</h2>
+    <p>This is the part I found genuinely delightful, and it is where the abstract stops being enough.</p>
+    <p>Iterating a fixed map on a state that is anchored to an input is the setup for a fixed point, and most tokens behave exactly that way. The state settles, and further loops change almost nothing. But when Geiping et al. actually traced the trajectories in PCA space, they found three regimes rather than one. Flip between them below.</p>
+  </div>
+
+  <figure>
+    <div class="scope">
+      <p class="scope-title">Three regimes, from three different random starts</p>
+      <p class="scope-sub">Each path is one token's latent state over successive loops, coloured by loop index. In the convergent case all three starts land in the same place, which is what makes an arbitrary test-time r legal.</p>
+      <svg id="sv-phase" viewBox="0 0 940 330" role="img" aria-label="Phase portrait of latent state trajectories over loop iterations, with a residual decay curve inset."></svg>
+      <div class="ctl">
+        <div class="seg" role="group" aria-label="trajectory regime">
+          <button class="btn" id="m-fix" aria-pressed="true">fixed point</button>
+          <button class="btn" id="m-orb" aria-pressed="false">orbit</button>
+          <button class="btn" id="m-dri" aria-pressed="false">drift</button>
+        </div>
+        <label for="in-i">loop i <input type="range" id="in-i" min="1" max="40" value="40" step="1"><output id="out-i">40</output></label>
+        <button class="btn" id="b-play">replay</button>
+      </div>
+    </div>
+    <figcaption>Most tokens just converge. On arithmetic tokens the state <em>"quickly falls into an orbit pattern in all three pairs of PCA directions."</em> And sometimes the trajectory drifts steadily in one direction, which the authors suggest the model <em>"could use to implement a mechanism to count how many iterations have occurred."</em></figcaption>
+  </figure>
+
+  <div class="col">
+    <p>That last one is my favourite finding in the whole literature. Nobody built the model a step counter. It grew one out of geometry, because it needed to know how far along it was.</p>
+
+    <h3>Path independence is what makes this usable</h3>
+    <p>Because <b>s</b><sub>0</sub> is random noise and the model still lands in the same place, the answer does not depend on where you started. That is what buys you the freedom to train at a mean of 32 loops and evaluate at 64.</p>
+    <p>It also gets you per-token early exit almost for free. Huginn's rule is just the KL divergence between the output distributions of two successive steps: <em>"if this divergence falls below 5&times;10<sup>-4</sup>, we stop iterating, sample the output token, and move to generate the next token."</em> Easy tokens leave after a few steps, hard ones keep going, and nobody had to label which is which. Watch the inset curve in the panel above cross its threshold in the convergent case and never cross it in the other two.</p>
+  </div>
+</section>
+
+<section id="training">
+  <div class="col">
+    <h2><a href="#training" class="h-anchor" aria-label="Link to this section">#</a>Three tricks that make it trainable</h2>
+    <p>Naively unrolling 32 blocks and backpropagating through all of them would cost you 32 layers of stored activations. None of the working recipes do that, and the three things they do instead are all a little counterintuitive.</p>
+    <p><b>Sample the loop count.</b> Huginn draws r per sequence from a log-normal Poisson with mean 32, a distribution that <em>"most often samples values less than r&#772;, but contains a heavy tail."</em> The model is therefore forced to be correct at many different depths, which is exactly the property you want to exploit at test time. The training distribution is the feature.</p>
+    <p><b>Truncate the gradient.</b> <em>"We backpropagate through only the last k iterations of the recurrent unit"</em>, with k = 8. The first 24 steps run forward with nothing stored. Training memory stops scaling with r, which is the whole reason this is affordable.</p>
+    <p><b>Start from noise.</b> Random <b>s</b><sub>0</sub>, a truncated normal with &sigma;<sup>2</sup> = 2/5, is what buys the path independence from the previous section. Initialise at zeros and you get a model that only works at the depth you trained it at.</p>
+  </div>
+
+  <figure>
+    <div class="scope">
+      <p class="scope-title">Forward for r steps, backward for k</p>
+      <p class="scope-sub">Only the dashed window keeps activations. Everything to its left is a no-grad forward pass. Drag k and watch the window move.</p>
+      <svg id="sv-train" viewBox="0 0 940 240" role="img" aria-label="An unrolled chain of recurrent steps with the final k steps enclosed in a gradient window, beside a histogram of sampled loop counts."></svg>
+      <div class="ctl">
+        <label for="in-k">gradient window k <input type="range" id="in-k" min="1" max="16" value="8" step="1"><output id="out-k">8</output></label>
+      </div>
+    </div>
+    <figcaption>The histogram on the right is the sampler for r: &tau; ~ N(log r&#772; - &frac12;&sigma;<sup>2</sup>, &sigma;), then r ~ Poisson(e<sup>&tau;</sup>) + 1, with &sigma; = &frac12; and r&#772; = 32.</figcaption>
+  </figure>
+</section>
+
+<section id="scaling">
+  <div class="col">
+    <h2><a href="#scaling" class="h-anchor" aria-label="Link to this section">#</a>How far it goes, and where it breaks</h2>
+    <p>Parameters and data were the two knobs everyone knows. Recurrence is a third, and unlike the other two you can turn it <em>after</em> training. Huginn <em>"can improve its performance on reasoning benchmarks, sometimes dramatically, up to a computation load equivalent to 50 billion parameters"</em>, from a 3.5 B model.</p>
+    <p>The 2026 results are what actually moved me. <a href="https://arxiv.org/abs/2510.25741">Ouro</a>, an open family of looped language models trained on 7.7 T tokens, reports 1.4 B and 2.6 B models that <em>"match the results of up to 12B SOTA LLMs across a wide range of benchmarks."</em> <a href="https://arxiv.org/abs/2604.12946">Parcae</a>, which stabilises looping by constraining the spectral norms of the injection parameters, gets a 1.3 B model to <em>"up to 87.5%"</em> the quality of <em>"a Transformer twice the size."</em></p>
+    <p>Then I hit the caveat that spoiled the happy story, and it is the most practically important thing in this post: the curve is not monotone.</p>
+  </div>
+
+  <figure>
+    <div class="scope">
+      <p class="scope-title">More loops help, until they do not</p>
+      <p class="scope-sub">Two qualitative regimes. This is a schematic of the reported shapes, not measured data. The citations underneath carry the real numbers.</p>
+      <div class="legend">
+        <span><i style="background:#1F9FC2"></i> stable recurrence</span>
+        <span><i style="background:#CB7A1C"></i> unstable recurrence</span>
+      </div>
+      <div class="chartwrap">
+        <svg id="sv-chart" viewBox="0 0 940 330" role="img" aria-label="Line chart, schematic: task accuracy against recurrence steps. A stable series rises and saturates; an unstable series rises, peaks near sixteen steps, then falls sharply."></svg>
+        <div id="tipbox" role="status" aria-live="polite"></div>
+      </div>
+      <div class="ctl">
+        <button class="btn" id="b-table" aria-pressed="false" aria-controls="dt">show values</button>
+      </div>
+      <div class="dtable" id="dt"></div>
+    </div>
+    <figcaption>Huginn's validation perplexity does keep improving through r = 1, 4, 8, 16, 32, 64. But STARS <a class="src" href="https://arxiv.org/abs/2605.26733">arXiv:2605.26733</a> documents the other regime directly: <em>"performance often peaks at a certain iteration depth and then collapses with further recurrence"</em>, and fixes it by regularising the Jacobian spectral radius toward asymptotically stable fixed points. A related failure is diagnosed in <a class="src" href="https://arxiv.org/abs/2606.24898">arXiv:2606.24898</a>, where scale-invariant readouts hide the state's radial magnitude from the loss while the loop keeps growing it, driving hidden-state norms into the thousands.</figcaption>
+  </figure>
+
+  <div class="col">
+    <p>So if you go and play with one of these models, sweep test-time r and find your task's peak. Do not assume more is more.</p>
+  </div>
+</section>
+
+<section id="dissociation">
+  <div class="col">
+    <h2><a href="#dissociation" class="h-anchor" aria-label="Link to this section">#</a>Reasoning wants depth, facts want parameters</h2>
+    <p>The most useful result in this literature is a dissociation, and once you see it the architecture stops looking like a trick and starts looking like a claim about what reasoning <em>is</em>.</p>
+    <p>Looped models are good at what depth buys and bad at what parameters buy. The intuition is that a reasoning problem with an iterative solution, like carrying digits or running p-hop induction, needs a number of sequential steps but reuses the same operation at each one. That is a loop. Storing a fact needs somewhere to put it, and a looped model has k layers of somewhere no matter how long it runs.</p>
+    <p>Ouro's ablations land in the same place from the other direction: the advantage comes from <em>"superior knowledge manipulation capabilities"</em> rather than from increased knowledge capacity. The model does not know more. It does more with what it knows. Saunshi et al. take the dissociation seriously enough to build a <em>"looping-based regularization"</em> out of it.</p>
+    <p>There is a wrinkle here that took until 2026 to surface, and it undercuts the "just a tweak" reading of all this. Dense looped models do not actually scale. <em>"Looped-MoE models scale better than the standard baseline while dense looped models do not"</em> <a class="src" href="https://arxiv.org/abs/2605.09165">arXiv:2605.09165</a>, because routing hands you different experts on each pass through the shared layers, <em>"recovering expressivity without additional parameters."</em> Weight tying costs you expressivity, and sparsity is how the field is buying it back. That is not a small architectural detail.</p>
+  </div>
+</section>
+
+<section id="cot">
+  <div class="col">
+    <h2><a href="#cot" class="h-anchor" aria-label="Link to this section">#</a>Against chain of thought</h2>
+    <p>This is the comparison everyone actually wants, and I think it comes down to bandwidth.</p>
+    <p>A chain-of-thought step pushes its result through the vocabulary: about 17 bits for a 128 k vocabulary, one discrete choice, committed and unrecoverable. A loop passes a hidden state instead: thousands of floats, uncommitted, able to hold several partial hypotheses at once. Saunshi et al. prove looped models <em>"implicitly generate latent thoughts and can simulate T steps of CoT with T loops"</em>, so a loop is at least as expressive per step, and it is not restricted to reasoning that happens to be sayable in English.</p>
+  </div>
+
+  <div class="wide-table">
+    <table>
+      <thead><tr><th style="width:20%">&nbsp;</th><th>Chain of thought</th><th>Recurrent depth</th></tr></thead>
+      <tbody>
+        <tr><td>Compute axis</td><td>Sequence length, horizontal</td><td>Layer count, vertical</td></tr>
+        <tr><td>Step bandwidth</td><td>One token, ~17 bits, discretised</td><td>A hidden state, thousands of floats</td></tr>
+        <tr><td>Training data</td><td>Wants reasoning traces</td><td>None special, ordinary pretraining</td></tr>
+        <tr><td>Context cost</td><td>Fills the window, and pollutes it</td><td>Zero tokens consumed</td></tr>
+        <tr><td>Billing</td><td>Reasoning tokens are billed</td><td>Loops are not tokens, so not billed</td></tr>
+        <tr><td>Legibility</td><td>Readable, of contested faithfulness</td><td>Not readable at all</td></tr>
+        <tr><td>Adaptivity</td><td>Model decides when to stop writing</td><td>Per-token exit on a convergence test</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p>Two footnotes worth having. The horizontal cousin of all this is <a href="https://arxiv.org/abs/2412.06769">Coconut</a>, which feeds the last hidden state back as the next <em>input embedding</em> rather than decoding it. Same instinct about the vocabulary bottleneck, opposite axis: it spends sequence positions instead of layers.</p>
+    <p>And that "contested faithfulness" row is doing real work in the safety argument. If readable traces were faithful records of computation, moving reasoning into latent space would be a clear loss of oversight. But the filler-token result in <a href="https://arxiv.org/abs/2404.15758">Let's Think Dot by Dot</a> and the position paper <a href="https://arxiv.org/abs/2504.09762">Stop Anthropomorphizing Intermediate Tokens</a> both suggest we were reading tea leaves to begin with. I do not think that settles the question, but it weakens "we are losing the trace" considerably.</p>
+  </div>
+</section>
+
+<section id="serving">
+  <div class="col">
+    <h2><a href="#serving" class="h-anchor" aria-label="Link to this section">#</a>The part that changed my mind</h2>
+    <p>I came in thinking the interesting question was whether looping is a real architectural advance. I left thinking that is the boring question. The interesting one is what it does to your serving stack, and almost none of the online argument touched it.</p>
+    <p><b>Your KV cache multiplies.</b> Every iteration is a fresh set of attention layers with its own keys and values, so cache memory grows linearly with reasoning depth. Huginn's mitigation is a fixed cache budget overwritten cyclically, and a budget of 4 cost them surprisingly little. <a href="https://arxiv.org/abs/2605.07721">MELT</a> goes further with one gated KV cache per layer shared across loops, reaching <em>"constant-memory iterative reasoning without sacrificing LoopLM performance."</em></p>
+    <p><b>Batching breaks.</b> Once tokens exit at different depths they stop marching through the model together, and your batch falls apart. <a href="https://arxiv.org/abs/2608.09444">Continuous depth batching</a> reschedules at the granularity of individual loop iterations and recovers <em>"up to 99% of the theoretical maximum speed-up from adaptive-depth"</em>, at 1.5 to 1.9&times; offline throughput on Ouro 1.4 B and Huginn 3.5 B. Without something like it, adaptive depth is a benchmark result rather than a deployment.</p>
+    <p><b>Loop order decides your memory bandwidth.</b> This is the subtlety most summaries miss, and it inverts the popular "great for local inference" claim.</p>
+  </div>
+
+  <figure>
+    <div class="scope">
+      <p class="scope-title">Same FLOPs, different number of weight loads</p>
+      <p class="scope-sub">Arrows mark a fetch of weights from memory. Repeating each block in place keeps its weights resident. Repeating the whole stack walks the entire model twice.</p>
+      <svg id="sv-band" viewBox="0 0 940 250" role="img" aria-label="Two schedules of blocks A, B and C. The first repeats each block in place and loads three sets of weights. The second repeats the whole stack and loads six."></svg>
+    </div>
+    <figcaption>Both schedules do identical arithmetic. Only the second doubles weight traffic. This is the flip side of a genuine advantage: Geiping et al. note that recurrent-depth networks <em>"perform more FLOPs per parameter than standard transformers, significantly reducing communication costs between accelerators at scale."</em> High arithmetic intensity is exactly what you want on a memory-bound accelerator, but only if you loop in the order that keeps weights in cache.</figcaption>
+  </figure>
+
+  <div class="col">
+    <p><b>And reinforcement learning needs new machinery.</b> Standard post-training rewards output tokens, which is a category error when the reasoning never becomes a token. <a href="https://arxiv.org/abs/2603.19714">LoopRPT</a> attacks this by assigning reinforcement signal to latent steps via an EMA teacher and noisy latent rollouts, and reports gains concentrated on hard tokens rather than on earlier exits. I would treat the RL story as open.</p>
+    <p>Put together, the picture is a model that is cheaper in parameters, more expensive in cache, awkward to batch, sensitive to loop order, and not yet straightforward to post-train. That is a real engineering programme, not a tweak.</p>
+  </div>
+</section>
+
+<section id="history">
+  <div class="col">
+    <h2><a href="#history" class="h-anchor" aria-label="Link to this section">#</a>How we got here</h2>
+    <p>Everyone pointing out that this is not new is correct. What is new is that it survives contact with scale, and that the surrounding engineering finally exists.</p>
+  </div>
+  <div class="wide-table">
+    <ol class="tl">
+      <li><time>2018</time><div><b><a href="https://arxiv.org/abs/1807.03819">Universal Transformers</a></b><p>Dehghani et al. iterate one shared block over all positions and add per-position halting through adaptive computation time. Turing-complete under assumptions. Almost everything since is a variation on this.</p></div></li>
+      <li><time>2019</time><div><b><a href="https://arxiv.org/abs/1909.11942">ALBERT</a> and <a href="https://arxiv.org/abs/1909.01377">deep equilibrium models</a></b><p>Cross-layer parameter sharing for its own sake, and separately the fixed-point view of a weight-tied layer with constant-memory implicit gradients. The second is the better lens for what looping is doing.</p></div></li>
+      <li><time>2023</time><div><b><a href="https://arxiv.org/abs/2301.13196">Looped transformers as programmable computers</a></b><p>Loops as instruction cycles, and the theory of what depth recurrence can express.</p></div></li>
+      <li><time>2024</time><div><b><a href="https://arxiv.org/abs/2409.15647">Length generalisation</a></b><p>Fan et al. show looped transformers with an adaptive number of steps generalise to unseen input lengths on tasks with known iterative solutions. Matching iterations to problem size is the whole point.</p></div></li>
+      <li><time>Feb 2025</time><div><b><a href="https://arxiv.org/abs/2502.05171">Huginn</a> and the <a href="https://arxiv.org/abs/2502.17416">depth-not-parameters claim</a></b><p>The first serious pretrained proof of concept at 3.5 B and 800 B tokens, alongside the theory that looping simulates chain of thought and that reasoning and memorisation come apart.</p></div></li>
+      <li><time>Jul 2025</time><div><b><a href="https://arxiv.org/abs/2507.10524">Mixture-of-Recursions</a></b><p>Routers assign per-token recursion depth, attention runs only over still-active tokens, and only their KV pairs get cached. Parameter sharing and adaptive compute in one framework.</p></div></li>
+      <li><time>Oct 2025</time><div><b><a href="https://arxiv.org/abs/2510.25741">Ouro</a></b><p>Looping moves into pretraining at 7.7 T tokens with an entropy-regularised objective for learned depth allocation. Open weights, and the strongest evidence that this is not a toy.</p></div></li>
+      <li><time>2026</time><div><b>The engineering year</b><p>Scaling laws and stability (<a href="https://arxiv.org/abs/2604.12946">Parcae</a>), constant-memory KV (<a href="https://arxiv.org/abs/2605.07721">MELT</a>), depth-adaptive serving (<a href="https://arxiv.org/abs/2608.09444">continuous depth batching</a>), the sparsity requirement (<a href="https://arxiv.org/abs/2605.09165">Looped-MoE</a>), test-time-scaling collapse and its fix (<a href="https://arxiv.org/abs/2605.26733">STARS</a>), latent-step RL (<a href="https://arxiv.org/abs/2603.19714">LoopRPT</a>), and the question of what should loop at all (<a href="https://arxiv.org/abs/2608.18230">MixerLoop</a>).</p></div></li>
+      <li><time>Sep 2026</time><div><b>A frontier model, reportedly</b><p><em>The Information</em> reports that Astra is a looped transformer. Which brings us to the argument.</p></div></li>
+    </ol>
+  </div>
+</section>
+
+<section id="astra">
+  <div class="col">
+    <h2><a href="#astra" class="h-anchor" aria-label="Link to this section">#</a>What is actually known about Astra</h2>
+    <p>Here I want to be careful, because the tiers of evidence are being quoted interchangeably and they are not remotely equal. I could not open OpenAI's own documents, so everything below is labelled by how I got it.</p>
+  </div>
+
+  <div class="col">
+    <ol class="ladder">
+      <li class="t1">
+        <h3>On the record, from OpenAI</h3>
+        <p>Jakub Pachocki, quoted in the discussion:</p>
+        <blockquote>"The depth of the computation graph for our present frontier models, including Astra, is within a factor of two of GPT-4."</blockquote>
+        <p>He also said that chain-of-thought monitoring is <em>"fragile and unfortunately trending in a negative direction, for reasons not contingent on architecture changes."</em> Both are posts on X, not a model card. OpenAI's "Path to Astra" document is cited as saying they are <em>"deploying Astra with additional chain-of-thought monitoring."</em></p>
+      </li>
+      <li class="t2">
+        <h3>Journalism</h3>
+        <p><em>The Information</em> reported that Astra uses a looped transformer, with an approach <em>"similar to the one Geiping et al. introduced"</em> in the February 2025 paper. This is the origin of the entire story, and there is no official architecture disclosure behind it.</p>
+      </li>
+      <li class="t3">
+        <h3>Inference, and numbers I could not check</h3>
+        <p>Rauno Arike, in the <a href="https://www.lesswrong.com/posts/PLisnSFir8y5AHkmP/how-concerned-should-we-be-about-astra-s-recurrent">LessWrong post</a> that started the discussion, infers <b>three to four loops</b> from Pachocki's statement.</p>
+        <p>A commenter quoting Astra's deployment safety report reports that Astra <em>"successfully controls 60.9%"</em> on a chain-of-thought controllability evaluation against <em>"16.1% for GPT-5.6 Sol and 1.7% for GPT-5.5 Thinking"</em>, including an ability to pretend to reason about a different question, and that UK AISI measured Astra's no-chain-of-thought maths time horizon at <em>"30.9 minutes compared to 3.6 minutes for GPT 5.6 Sol."</em> I have not verified either figure against the report itself, and you should discount them accordingly.</p>
+      </li>
+    </ol>
+  </div>
+
+  <div class="col">
+    <div class="aside">
+      <h3>A consistency check worth doing</h3>
+      <p>Those two families of numbers look contradictory at first: a modest change in depth, an enormous change in capability. They are not. Arike's own earlier work is quoted as finding that <em>"to double a model's no-CoT time horizon, layer count needs to be increased only by 1.3&times;."</em></p>
+      <p>Take the reported time horizons at face value. 30.9 / 3.6 is 8.6&times;, which is log<sub>2</sub>(8.6) = 3.1 doublings, which at 1.3&times; per doubling needs 1.3<sup>3.1</sup> = <b>2.3&times; the layers</b>. That sits just outside "within a factor of two", but close enough that both statements can be roughly true at once. The arithmetic is mine, not theirs, and it rests on numbers I could not verify.</p>
+      <p>The takeaway is the one that should change how you read the rest of the argument: <b>a small multiple of depth buys a large multiple of single-pass reasoning.</b> That is simultaneously why looping is attractive and why a few extra loops are not obviously a small thing.</p>
+    </div>
+  </div>
+</section>
+
+<section id="argument">
+  <div class="col">
+    <h2><a href="#argument" class="h-anchor" aria-label="Link to this section">#</a>I read the whole thread</h2>
+    <p>The <a href="https://news.ycombinator.com/item?id=49553321">Hacker News discussion</a> ran to 147 points and around 130 comments when I read it. Nobody in it identified as working at a frontier lab; the frontier-lab voices appear as quoted posts. Here is who claims what, and where the literature can actually settle it.</p>
+  </div>
+
+  <div class="wide-table">
+    <table>
+      <thead><tr><th style="width:26%">The claim</th><th style="width:15%">Whose</th><th>What the evidence says</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>"Just a tiny architectural tweak." Same storage, roughly 2&times; compute, and two passes gave the best trade-off on Nanbeige4.2-3B.</td>
+          <td>Sebastian Raschka, quoted</td>
+          <td>Fair on the architecture, and the priority complaints are right. But not a free tweak: dense looping does not scale without sparsity <a class="src" href="https://arxiv.org/abs/2605.09165">2605.09165</a> and does not stay stable without spectral control <a class="src" href="https://arxiv.org/abs/2604.12946">2604.12946</a>.</td>
+        </tr>
+        <tr>
+          <td>"It changes zero" for safety, because a QKV packing limit caps effective gains at roughly 1.3 to 1.8&times;.</td>
+          <td>kelseyfrog</td>
+          <td>That ceiling looks too low. Ouro's 1.4 B competing with 12 B models, and Parcae at 87.5% of a 2&times; transformer, are larger effects. And if 1.3&times; layers really doubles no-CoT time horizon, a small factor is not self-evidently safe.</td>
+        </tr>
+        <tr>
+          <td>Astra's controllability and no-CoT maths numbers are direct evidence of hidden reasoning.</td>
+          <td>famouswaffles</td>
+          <td>If the figures hold, this is the strongest empirical point in the thread. It is also the least verified: a commenter quoting a report, not the report.</td>
+        </tr>
+        <tr>
+          <td>Deeper is always at least as good, since extra loops can exit early or no-op. Degradation is "merely training stability issues."</td>
+          <td>Legend2440</td>
+          <td>False as stated today. STARS shows performance peaking then collapsing with more recurrence, and <a class="src" href="https://arxiv.org/abs/2606.24898">2606.24898</a> shows hidden-state norms exploding when the readout hides scale from the loss. "Merely" is carrying an entire live research programme.</td>
+        </tr>
+        <tr>
+          <td>Without new input you get locked states or oscillations, and lossy attractors drag the answer off target.</td>
+          <td>nomel</td>
+          <td>Largely vindicated, and more specifically than the poster knew: Geiping et al. observed exactly orbits and drifts, not only fixed points, and STARS treats the Jacobian spectral radius as the thing to control.</td>
+        </tr>
+        <tr>
+          <td>A big win for local models, which are RAM-limited with compute to spare.</td>
+          <td>zormino, corrected by stymaar</td>
+          <td>Only with the right loop order, as the panel above shows. And the KV cache still grows with depth unless you use MELT-style sharing.</td>
+        </tr>
+        <tr>
+          <td>Latent reasoning is not billed and does not pollute the context window.</td>
+          <td>simianwords</td>
+          <td>Correct, and underrated as a product argument. It is also the same sentence as "you cannot see it", which is the entire safety concern.</td>
+        </tr>
+        <tr>
+          <td>The worry is a configurable depth dial, currently set low, trivially turned up.</td>
+          <td>Ryan Greenblatt, quoted</td>
+          <td>The sharpest version of the concern, and not answered by any current number. Geoffrey Irving's companion point is that to get safety from bounding circuit depth <em>"you have to bound it very low"</em>, so depths in the hundreds are <em>"a fake bound."</em></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <div class="aside flag">
+      <h3>The fact that reframed the thread for me</h3>
+      <p>Loop counts are going <em>down</em> as models get bigger, not up. Huginn used 32 loops at 3.5 B. The 20 B model referred to in Arike's post as Loopie reportedly uses two. Nanbeige4.2-3B uses two passes. As the literature summary in that post puts it, <em>"a small loop count is currently the compute-efficient regime."</em></p>
+      <p>So the near-term picture is two to four loops on frontier models, not thirty-two, and certainly not the millions one commenter predicted. That deflates the immediate alarm while leaving Greenblatt's version completely intact, because the thing holding loop counts down is a compute-efficiency argument, and compute-efficiency arguments move.</p>
+    </div>
+  </div>
+</section>
+
+<section id="hands">
+  <div class="col">
+    <h2><a href="#hands" class="h-anchor" aria-label="Link to this section">#</a>If you want to touch it</h2>
+    <p>Both serious pretrained looped models are open, which is the nicest thing about this corner of the field. <a href="https://huggingface.co/tomg-group-umd/huginn-0125">Huginn-0125</a> is on Hugging Face with training code at <a href="https://github.com/seal-rg/recurrent-pretraining">seal-rg/recurrent-pretraining</a>, and <a href="https://ouro-llm.github.io">Ouro</a> publishes 1.4 B and 2.6 B weights. Between them you can reproduce most of what is above on a single node.</p>
+    <p>Four things are worth an afternoon, in this order. Sweep test-time r past the training mean and find where your task peaks, because it will peak. Turn on the KL exit criterion and log per-token exit depth against token identity, which is the most legible thing this architecture produces and the closest thing it has to a readable trace. Vary the gradient window k and watch what it costs you. Then remove the input injection and watch the whole thing fall apart, which is the fastest way to believe that the anchor was doing the work.</p>
+  </div>
+
+  <div class="col reading">
+    <h2 style="font-size:1.05rem;margin:2.2rem 0 .3rem">Further reading</h2>
+
+    <h3>Start with these two</h3>
+    <ul>
+      <li><a href="https://arxiv.org/abs/2502.05171"><b>Scaling up Test-Time Compute with Latent Reasoning: A Recurrent Depth Approach</b></a> <i>Geiping et al., 2025. The architecture, the training recipe, and the trajectory analysis. Everything quoted above without attribution comes from here.</i></li>
+      <li><a href="https://arxiv.org/abs/2502.17416"><b>Reasoning with Latent Thoughts: On the Power of Looped Transformers</b></a> <i>Saunshi et al., ICLR 2025. Why depth and not parameters, and the proof that loops simulate chain of thought.</i></li>
+    </ul>
+
+    <h3>Models you can download</h3>
+    <ul>
+      <li><a href="https://huggingface.co/tomg-group-umd/huginn-0125"><b>Huginn-0125</b></a> <i>3.5 B, 800 B tokens. Code at <a href="https://github.com/seal-rg/recurrent-pretraining">seal-rg/recurrent-pretraining</a>.</i></li>
+      <li><a href="https://ouro-llm.github.io"><b>Ouro</b></a> <i>1.4 B and 2.6 B looped language models, 7.7 T tokens. Paper: <a href="https://arxiv.org/abs/2510.25741">arXiv:2510.25741</a>.</i></li>
+    </ul>
+
+    <h3>Lineage</h3>
+    <ul>
+      <li><a href="https://arxiv.org/abs/1807.03819"><b>Universal Transformers</b></a> <i>Dehghani et al., 2018. The original, with adaptive computation time.</i></li>
+      <li><a href="https://arxiv.org/abs/1909.11942"><b>ALBERT</b></a> and <a href="https://arxiv.org/abs/1909.01377"><b>Deep Equilibrium Models</b></a> <i>2019. Parameter sharing, and the fixed-point framing.</i></li>
+      <li><a href="https://arxiv.org/abs/2301.13196"><b>Looped Transformers as Programmable Computers</b></a> <i>Giannou et al., 2023.</i></li>
+      <li><a href="https://arxiv.org/abs/2409.15647"><b>Looped Transformers for Length Generalization</b></a> <i>Fan et al., 2024.</i></li>
+      <li><a href="https://arxiv.org/abs/2507.10524"><b>Mixture-of-Recursions</b></a> <i>Bae et al., 2025. Per-token recursion depth by routing.</i></li>
+      <li><a href="https://arxiv.org/abs/2412.06769"><b>Coconut</b></a> <i>Hao et al., 2024. The horizontal version of the same instinct.</i></li>
+    </ul>
+
+    <h3>The 2026 engineering, if you plan to deploy this</h3>
+    <ul>
+      <li><a href="https://arxiv.org/abs/2604.12946"><b>Parcae</b></a> <i>Scaling laws and stability. Looping and data should be increased in tandem.</i></li>
+      <li><a href="https://arxiv.org/abs/2605.07721"><b>MELT</b></a> <i>One shared, gated KV cache per layer. Constant memory across loops.</i></li>
+      <li><a href="https://arxiv.org/abs/2608.09444"><b>Continuous depth batching</b></a> <i>How to actually serve adaptive depth.</i></li>
+      <li><a href="https://arxiv.org/abs/2605.09165"><b>Sparse Layers are Critical to Scaling Looped Language Models</b></a> <i>Dense looping does not scale; Looped-MoE does.</i></li>
+      <li><a href="https://arxiv.org/abs/2605.26733"><b>STARS</b></a> <i>Why test-time scaling collapses, and how to stop it.</i></li>
+      <li><a href="https://arxiv.org/abs/2606.24898"><b>The readout blind spot</b></a> <i>Dense supervision trains exits, not the recurrent transition.</i></li>
+      <li><a href="https://arxiv.org/abs/2603.19714"><b>LoopRPT</b></a> <i>Reinforcement learning on latent steps.</i></li>
+      <li><a href="https://arxiv.org/abs/2608.18230"><b>MixerLoop</b></a> <i>What should loop: the mixer, not the feed-forward network.</i></li>
+    </ul>
+
+    <h3>The Astra discussion</h3>
+    <ul>
+      <li><a href="https://www.lesswrong.com/posts/PLisnSFir8y5AHkmP/how-concerned-should-we-be-about-astra-s-recurrent"><b>How concerned should we be about Astra's recurrent architecture?</b></a> <i>Rauno Arike, LessWrong, 2 September 2026.</i></li>
+      <li><a href="https://news.ycombinator.com/item?id=49553321"><b>The Hacker News thread</b></a> <i>147 points, around 130 comments.</i></li>
+      <li><a href="https://arxiv.org/abs/2404.15758"><b>Let's Think Dot by Dot</b></a> and <a href="https://arxiv.org/abs/2504.09762"><b>Stop Anthropomorphizing Intermediate Tokens</b></a> <i>Why the readable trace may never have been the thing we thought it was.</i></li>
+    </ul>
+  </div>
+</section>
+
+</div>
+
+<div class="wrap postnotes">
+  <div class="col">
+    <h3 style="margin:0 0 .4rem;font-size:.95rem;color:var(--ink)">What I could not check</h3>
+    <p>Quotations from Geiping et al. are from <a href="https://arxiv.org/abs/2502.05171">the paper</a>. The 2026 work I read as abstracts, not in full, so treat those claims as reported rather than assessed. The Astra material comes entirely from Arike's LessWrong post and its Hacker News thread, with sourcing tiers marked in that section: OpenAI's own documents were not accessible to me, and no benchmark figure in this post has been verified against a primary report.</p>
+    <p>The chart in the scaling section is a schematic of reported shapes, not data. The consistency arithmetic in the Astra section is mine.</p>
+    <p class="note">Chart colours <code>#1F9FC2</code> and <code>#CB7A1C</code> pass lightness-band, chroma-floor, colour-vision-deficiency separation, normal-vision and contrast checks against the panel surface <code>#0B1620</code>.</p>
+  </div>
+</div>
+
+<div id="rail" aria-hidden="true"></div>
+<script src="/assets/js/loops.js"></script>

@@ -1,0 +1,20 @@
+---
+layout: default
+---
+<article class="post">
+
+  <header class="wrap postmast">
+    <div class="col">
+      {% if page.kicker %}<p class="kicker">{{ page.kicker }}</p>{% endif %}
+      <h1>{{ page.title }}</h1>
+      {% if page.dek %}<p class="dek">{{ page.dek }}</p>{% endif %}
+      <p class="meta">
+        <time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date: "%-d %B %Y" }}</time>
+        {% if page.reading %}<span>{{ page.reading }}</span>{% endif %}
+      </p>
+    </div>
+  </header>
+
+  {{ content }}
+
+</article>

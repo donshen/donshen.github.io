@@ -1,3 +1,9 @@
-name: Don Shen, Chemical Engineer
+title: "Zhengyuan (Don) Shen"
+description: "Notes on machine learning papers, mostly about how models actually work."
+url: "https://donshen.github.io"
+
 markdown: kramdown
-permalink: /blog/:year/:month/:day/:title
+permalink: /blog/:year/:month/:day/:title/
+
+exclude:
+  - README.md
