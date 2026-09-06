@@ -3,7 +3,6 @@ layout: post
 title: "Promptimus: Improving already good LLM prompts with zero manual engineering"
 external: https://www.amazon.science/blog/promptimus-improving-already-good-llm-prompts-with-zero-manual-engineering
 venue: Amazon Science
-byline: "with Yunfei Bai, Sullam Jeoung and Shuai Wang"
 dek: "Most prompt optimisers assume you are starting from something bad. This one starts from a prompt that already works, and finds what is still wrong with it."
 date: 2026-05-14
 ---
